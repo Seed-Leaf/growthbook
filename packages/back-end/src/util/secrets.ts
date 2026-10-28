@@ -17,6 +17,12 @@ export const LOG_LEVEL = process.env.LOG_LEVEL;
 
 export const IS_CLOUD = stringToBoolean(process.env.IS_CLOUD);
 export const IS_MULTI_ORG = stringToBoolean(process.env.IS_MULTI_ORG);
+export const SSO_GOOGLE_WORKSPACE_DOMAINS = (
+  process.env.SSO_GOOGLE_WORKSPACE_DOMAINS || ""
+)
+  .split(",")
+  .map((domain) => domain.trim().toLowerCase())
+  .filter(Boolean);
 
 /** Enable GrowthBook OAuth 2.1 Authorization Server endpoints (MCP / CLI login). Default on. */
 export const OAUTH_AS_ENABLED = stringToBoolean(

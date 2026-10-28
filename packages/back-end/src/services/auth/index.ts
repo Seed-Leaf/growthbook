@@ -10,7 +10,11 @@ import {
   EventUserLoggedIn,
 } from "shared/types/events/event-types";
 import { logger } from "back-end/src/util/logger";
-import { IS_CLOUD, IS_LOCALHOST } from "back-end/src/util/secrets";
+import {
+  IS_CLOUD,
+  IS_LOCALHOST,
+  SSO_GOOGLE_WORKSPACE_DOMAINS,
+} from "back-end/src/util/secrets";
 import { AuthRequest } from "back-end/src/types/AuthRequest";
 import {
   hasUser,
@@ -48,6 +52,7 @@ import { ProjectModel } from "back-end/src/models/ProjectModel";
 import { AuthConnection } from "./AuthConnection";
 import { OpenIdAuthConnection } from "./OpenIdAuthConnection";
 import { LocalAuthConnection } from "./LocalAuthConnection";
+import { isAllowedGoogleWorkspaceUser } from "./googleWorkspacePolicy";
 
 type JWTInfo = {
   email: string;
@@ -117,6 +122,14 @@ export async function processJWT(
   res: Response<unknown, EventUserForResponseLocals>,
   next: NextFunction,
 ): Promise<void> {
+  // This runs after signature, issuer and audience verification, before user lookup.
+  if (!isAllowedGoogleWorkspaceUser(req.user, SSO_GOOGLE_WORKSPACE_DOMAINS)) {
+    res.status(403).json({
+      status: 403,
+      message: "Sign in with an allowed Google Workspace account.",
+    });
+    return;
+  }
   const parsedJWT = getInitialDataFromJWT(req.user);
   const { email, name, verified } = parsedJWT;
 

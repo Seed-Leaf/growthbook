@@ -95,6 +95,15 @@ Retained names such as `postProvisionEventForwarderToLicenseServer` can be typed
 unavailable adapters. Their names alone are not evidence of an outbound request.
 Likewise, source files under `enterprise/` are not all license enforcement code.
 
+## Deployment-specific preservation
+
+The root Dockerfile uses public Node/Python images and must not regain a DHI
+registry dependency during an upstream merge. Preserve non-root uid 1000, native
+module compatibility and the Python statistical engine. See `deploy/README.md`.
+For installations setting `SSO_GOOGLE_WORKSPACE_DOMAINS`, preserve the verified
+Google issuer, email and hosted-domain checks before user lookup;
+`SSO_CONFIG.emailDomains` alone is only an organization auto-join setting.
+
 ## Validation
 
 After installing dependencies and building shared dependencies as required:

@@ -22,6 +22,7 @@
     "packages/back-end/test/services/aiUsageRecorder.test.ts",
     "packages/back-end/test/services/localProxyUpdates.test.ts",
     "packages/back-end/test/services/plan-limits.test.ts",
-    "packages/back-end/test/models/aiTokenUsageDailyLimit.test.ts"
+    "packages/back-end/test/models/aiTokenUsageDailyLimit.test.ts",
+    "packages/back-end/test/services/googleWorkspacePolicy.test.ts"
   ]
 }
