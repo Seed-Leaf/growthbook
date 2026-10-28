@@ -17,7 +17,7 @@ import {
 } from "shared/permissions";
 import { isExpired } from "shared/api-key-expiration";
 import uniqid from "uniqid";
-import { LicenseInterface, accountFeatures } from "shared/enterprise";
+import { accountFeatures } from "shared/enterprise";
 import {
   AgreementType,
   ConfirmRule,
@@ -127,11 +127,6 @@ import {
   definitionsBuildFingerprint,
   ifNoneMatchMatches,
 } from "back-end/src/util/definitionsEtag";
-import {
-  classifyEmail,
-  parseAttributionCookie,
-  postSignupAttributionToLicenseServer,
-} from "back-end/src/util/signup-attribution";
 import { usingOpenId } from "back-end/src/services/auth";
 import { getSdkPayloadSizeAlerts } from "back-end/src/services/sdkPayloadSize";
 import { getSSOConnectionSummary } from "back-end/src/models/SSOConnectionModel";
@@ -157,24 +152,16 @@ import {
 } from "back-end/src/models/AuditModel";
 import { ReqContext } from "back-end/types/request";
 import { fireSdkWebhook } from "back-end/src/jobs/sdkWebhooks";
-import {
-  getInstallationName,
-  getLicenseMetaData,
-  getUserCodesForOrg,
-} from "back-end/src/services/licenseData";
+import { getInstallationName } from "back-end/src/services/licenseData";
 import { findSDKConnectionsByIds } from "back-end/src/models/SdkConnectionModel";
 import {
-  getLicense,
-  licenseInit,
   getLowestPlanPerFeature,
   getAccountPlan,
   getEffectiveAccountPlan,
   getLicenseError,
-  getSubscriptionFromLicense,
   orgHasPremiumFeature,
 } from "back-end/src/enterprise";
 import { getUsageFromCache } from "back-end/src/enterprise/billing";
-import { logger } from "back-end/src/util/logger";
 import { validatePriorSettings } from "back-end/src/util/priors";
 import { getAnalysisEndDateSettingsError } from "back-end/src/services/scheduledAnalysisEndDate";
 import {
@@ -855,7 +842,6 @@ export async function getOrganization(
 
   const context = getContextFromReq(req);
   const { org, userId } = context;
-  const forceLicenseRefresh = req.query.forceLicenseRefresh !== undefined;
 
   const {
     invites,
@@ -875,38 +861,8 @@ export async function getOrganization(
     isVercelIntegration,
   } = org;
 
-  const resolveLicense =
-    async (): Promise<Partial<LicenseInterface> | null> => {
-      if (!licenseKey && !process.env.LICENSE_KEY) return null;
-      // automatically set the license data based on org license key
-      let license: Partial<LicenseInterface> | null =
-        getLicense(licenseKey || process.env.LICENSE_KEY) || null;
-      if (
-        forceLicenseRefresh ||
-        !license ||
-        (license.organizationId && license.organizationId !== id)
-      ) {
-        try {
-          license =
-            (await licenseInit(
-              org,
-              getUserCodesForOrg,
-              getLicenseMetaData,
-              forceLicenseRefresh,
-            )) || null;
-        } catch (e) {
-          logger.error(e, "setting license failed");
-          if (forceLicenseRefresh) {
-            throw e;
-          }
-        }
-      }
-      return license;
-    };
-
   // These lookups don't depend on each other, so run them in parallel
   const [
-    license,
     installationName,
     expandedMembers,
     agreements,
@@ -915,7 +871,6 @@ export async function getOrganization(
     expiringPersonalAccessTokens,
     expiringApiKeys,
   ] = await Promise.all([
-    resolveLicense(),
     getInstallationName(org),
     expandOrgMembers(members, userId),
     context.models.agreements.getAll(),
@@ -996,9 +951,9 @@ export async function getOrganization(
     members: expandedMembers,
     currentUserPermissions,
     teams: teamsWithMembers,
-    license: license && { ...license, id: maskKey(license.id) },
+    license: null,
     installationName: installationName || null,
-    subscription: license ? getSubscriptionFromLicense(license) : null,
+    subscription: null,
     agreements: agreementsAgreed || [],
     aiKeyProviders,
     sttModel,
@@ -1382,7 +1337,6 @@ export async function postInviteAccept(
       throw new Error("Must be logged in");
     }
     const org = await acceptInvite(key, req.userId, req.email);
-    await licenseInit(org, getUserCodesForOrg, getLicenseMetaData, true);
 
     return res.status(200).json({
       status: 200,
@@ -1590,26 +1544,6 @@ export async function signup(
       externalId,
       demographicData,
     });
-
-    // Forward marketing attribution to central-license-server for the new
-    // org owner (best-effort, Cloud-only). Failures are logged and swallowed
-    // so attribution issues never block org creation.
-    if (IS_CLOUD) {
-      try {
-        await postSignupAttributionToLicenseServer({
-          organizationId: org.id,
-          userId: req.userId,
-          email: req.email,
-          emailType: classifyEmail(req.email),
-          attribution: parseAttributionCookie(req),
-        });
-      } catch (e) {
-        req.log.error(
-          e,
-          "Failed to forward signup attribution to license server",
-        );
-      }
-    }
 
     req.organization = org;
     const context = getContextFromReq(req);

@@ -30,6 +30,9 @@ jobs:
       - name: Check formatting
         run: pnpm pretty:check
 
+      - name: Check fork behavior policy
+        run: pnpm fork:check
+
   licenses:
     runs-on: depot-ubuntu-24.04
     steps:

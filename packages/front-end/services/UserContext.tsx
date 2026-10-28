@@ -562,29 +562,7 @@ export function UserContextProvider({ children }: { children: ReactNode }) {
   const subscription = currentOrg?.subscription || null;
   const license = currentOrg?.license;
 
-  const canSubscribe = useMemo(() => {
-    const disableSelfServeBilling =
-      organization?.disableSelfServeBilling || false;
-
-    if (disableSelfServeBilling) return false;
-
-    if (organization?.enterprise) return false; //TODO: Remove this once we have moved the license off the organization
-
-    if (license?.plan === "enterprise") return false;
-
-    // if already on pro, they must have a subscription - some self-hosted pro have an annual contract not directly through stripe.
-    if (
-      license &&
-      ["pro", "pro_sso"].includes(license.plan || "") &&
-      !subscription?.externalId
-    )
-      return false;
-
-    if (["active", "trialing", "past_due"].includes(subscription?.status || ""))
-      return false;
-
-    return true;
-  }, [organization, license, subscription]);
+  const canSubscribe = false;
 
   return (
     <UserContext.Provider

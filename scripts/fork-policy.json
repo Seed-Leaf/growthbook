@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "isolatedModules": {
+    "local-plan-resolution": "packages/back-end/src/enterprise/licenseUtil.ts",
+    "local-usage": "packages/back-end/src/enterprise/billing/index.ts",
+    "unavailable-managed-warehouse": "packages/back-end/src/services/licenseServerManagedClickhouse.ts"
+  },
+  "testProject": "packages/back-end",
+  "tests": [
+    "packages/back-end/test/enterprise.test.ts",
+    "packages/back-end/test/license.test.ts",
+    "packages/back-end/test/billing.test.ts",
+    "packages/back-end/test/services/setLicenseKey.test.ts",
+    "packages/back-end/test/services/organizationInvites.test.ts",
+    "packages/back-end/test/services/organizationSeatLimits.test.ts",
+    "packages/back-end/test/services/slackIdentityRouting.test.ts",
+    "packages/back-end/test/services/eventForwarderProvisioning.test.ts",
+    "packages/back-end/test/services/eventForwarderProvisioning.featureGate.test.ts",
+    "packages/back-end/test/services/eventForwarderConnectorStatusSync.test.ts",
+    "packages/back-end/test/services/eventForwarderDatasourceUpdate.test.ts",
+    "packages/back-end/test/services/eventForwarderDatasourceLifecycle.test.ts",
+    "packages/back-end/test/services/aiUsageRecorder.test.ts",
+    "packages/back-end/test/services/localProxyUpdates.test.ts",
+    "packages/back-end/test/services/plan-limits.test.ts",
+    "packages/back-end/test/models/aiTokenUsageDailyLimit.test.ts"
+  ]
+}

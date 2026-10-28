@@ -12,16 +12,12 @@ jest.mock("back-end/src/models/AITokenUsageModel", () => ({
   ...jest.requireActual("back-end/src/models/AITokenUsageModel"),
   updateTokenUsage: jest.fn(),
 }));
-jest.mock("back-end/src/services/licenseServerManagedClickhouse", () => ({
-  logCloudAIUsage: jest.fn(),
-}));
 jest.mock("back-end/src/util/logger", () => ({
   logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn() },
 }));
 
 import { trackAIUsage } from "back-end/src/services/growthbook";
 import { updateTokenUsage } from "back-end/src/models/AITokenUsageModel";
-import { logCloudAIUsage } from "back-end/src/services/licenseServerManagedClickhouse";
 import { logger } from "back-end/src/util/logger";
 import { usageRecorder } from "back-end/src/enterprise/services/ai";
 
@@ -52,7 +48,7 @@ beforeEach(() => {
 });
 
 describe("usageRecorder", () => {
-  it("tracks, meters and logs a managed-key call on Cloud", async () => {
+  it("tracks and meters a managed-key call locally on Cloud", async () => {
     await recorder(false)({
       usage: { inputTokens: 10, outputTokens: 5 },
       totalTokens: 15,
@@ -72,14 +68,12 @@ describe("usageRecorder", () => {
       numTokensUsed: 15,
       organization: context.org,
     });
-    expect(logCloudAIUsage).toHaveBeenCalledTimes(1);
   });
 
-  it("does not meter an org's own key, but still tracks and logs", async () => {
+  it("does not meter an org's own key, but still tracks usage", async () => {
     await recorder(true)({ totalTokens: 15, outcome: "success" });
     expect(updateTokenUsage).not.toHaveBeenCalled();
     expect(trackAIUsage).toHaveBeenCalledTimes(1);
-    expect(logCloudAIUsage).toHaveBeenCalledTimes(1);
   });
 
   it("records a cancelled call with its lower-bound usage", async () => {
@@ -104,7 +98,6 @@ describe("usageRecorder", () => {
       recorder(false)({ totalTokens: 15, outcome: "success" }),
     ).resolves.toBeUndefined();
     expect(logger.error).toHaveBeenCalledTimes(1);
-    expect(logCloudAIUsage).toHaveBeenCalledTimes(1);
   });
 
   it("only tracks on self-hosted", async () => {
@@ -112,6 +105,5 @@ describe("usageRecorder", () => {
     await recorder(false)({ totalTokens: 15, outcome: "success" });
     expect(trackAIUsage).toHaveBeenCalledTimes(1);
     expect(updateTokenUsage).not.toHaveBeenCalled();
-    expect(logCloudAIUsage).not.toHaveBeenCalled();
   });
 });

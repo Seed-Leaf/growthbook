@@ -12,7 +12,6 @@ import {
 } from "shared/types/organization";
 import { ApiKeyInterface, ApiKeyWithRole } from "shared/types/apikey";
 import { TeamInterface } from "shared/types/team";
-import { licenseInit } from "back-end/src/enterprise";
 import { ApiRequestLocals } from "back-end/types/api";
 import {
   getContextFromReq,
@@ -33,10 +32,6 @@ import {
   getUserPermissions,
 } from "back-end/src/util/organization.util";
 import { getUserById, getUserByEmail } from "back-end/src/models/UserModel";
-import {
-  getLicenseMetaData,
-  getUserCodesForOrg,
-} from "back-end/src/services/licenseData";
 import { ReqContextClass } from "back-end/src/services/context";
 import { TeamModel } from "back-end/src/models/TeamModel";
 import { ProjectModel } from "back-end/src/models/ProjectModel";
@@ -170,8 +165,6 @@ function authenticateWithJwt(
       };
 
       res.log = req.log = req.log.child(getCustomLogProps(req as Request));
-
-      await licenseInit(context.org, getUserCodesForOrg, getLicenseMetaData);
 
       next();
     })
@@ -411,9 +404,6 @@ function authenticateWithApiKey(
       req.audit = async (data) => {
         await req.context.auditLog(data);
       };
-
-      // init license for org if it exists
-      await licenseInit(org, getUserCodesForOrg, getLicenseMetaData);
 
       // Continue to the actual request handler
       next();

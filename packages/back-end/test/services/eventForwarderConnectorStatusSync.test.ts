@@ -1,49 +1,10 @@
+import { EventForwarderConfigInterface } from "shared/validators";
 import {
   buildEventForwarderStatusResponse,
   mapLicenseConnectorPhaseToEventForwarderStatus,
   syncEventForwarderStatusFromLicenseServer,
 } from "back-end/src/services/eventForwarder/connector";
-import { postEventForwarderStatusToLicenseServer } from "back-end/src/enterprise/licenseUtil";
-import { queueDelayedEventForwarderWarehouseSyncForDatasource } from "back-end/src/services/eventForwarder/warehouseSync";
-
-jest.mock("back-end/src/enterprise/licenseUtil", () => ({
-  postEventForwarderStatusToLicenseServer: jest.fn(),
-}));
-
-jest.mock("back-end/src/services/eventForwarder/warehouseSync", () => ({
-  queueDelayedEventForwarderWarehouseSyncForDatasource: jest.fn(),
-}));
-
-const statusMock =
-  postEventForwarderStatusToLicenseServer as jest.MockedFunction<
-    typeof postEventForwarderStatusToLicenseServer
-  >;
-const warehouseSyncMock =
-  queueDelayedEventForwarderWarehouseSyncForDatasource as jest.MockedFunction<
-    typeof queueDelayedEventForwarderWarehouseSyncForDatasource
-  >;
-
-function efConfig(
-  overrides: Partial<{
-    status: string;
-    initialWarehouseSyncQueued: boolean;
-  }> = {},
-) {
-  return {
-    id: "efc_1",
-    organization: "org1",
-    datasourceId: "ds_1",
-    sinkType: "bigquery" as const,
-    config: "encrypted",
-    status: "pending" as const,
-    projects: [],
-    topic: "gb-events-org1-ds1",
-    schemaId: 10,
-    connectorName: "connector_1",
-    initialWarehouseSyncQueued: undefined,
-    ...overrides,
-  };
-}
+import { ReqContext } from "back-end/types/request";
 
 describe("mapLicenseConnectorPhaseToEventForwarderStatus", () => {
   it("maps provisioning to pending", () => {
@@ -87,69 +48,21 @@ describe("buildEventForwarderStatusResponse", () => {
   });
 });
 
-describe("syncEventForwarderStatusFromLicenseServer", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    statusMock.mockResolvedValue({
-      confluentState: "RUNNING",
-      phase: "ready",
-    });
-    warehouseSyncMock.mockResolvedValue(undefined);
+it("reports a disabled forwarder without mutating its stored status", async () => {
+  const update = jest.fn();
+  const context = {
+    models: { eventForwarderConfigs: { update } },
+  } as unknown as ReqContext;
+  const config = {
+    id: "efc",
+    status: "ready",
+  } as EventForwarderConfigInterface;
+  expect(
+    await syncEventForwarderStatusFromLicenseServer(context, config),
+  ).toEqual({
+    status: "error",
+    phase: "error",
+    message: "Event Forwarder is disabled for this installation.",
   });
-
-  it("queues initial warehouse sync when connector becomes ready", async () => {
-    const update = jest.fn().mockResolvedValue(undefined);
-    const context = {
-      org: { id: "org1" },
-      models: { eventForwarderConfigs: { update } },
-    } as never;
-    const config = efConfig();
-
-    await syncEventForwarderStatusFromLicenseServer(context, config as never);
-
-    expect(warehouseSyncMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        org: expect.objectContaining({ id: "org1" }),
-      }),
-      "ds_1",
-    );
-    expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "efc_1" }),
-      expect.objectContaining({ initialWarehouseSyncQueued: true }),
-    );
-  });
-
-  it("skips initial warehouse sync when already queued", async () => {
-    const update = jest.fn().mockResolvedValue(undefined);
-    const context = {
-      org: { id: "org1" },
-      models: { eventForwarderConfigs: { update } },
-    } as never;
-
-    await syncEventForwarderStatusFromLicenseServer(
-      context,
-      efConfig({ status: "ready", initialWarehouseSyncQueued: true }) as never,
-    );
-
-    expect(warehouseSyncMock).not.toHaveBeenCalled();
-  });
-
-  it("does not set initialWarehouseSyncQueued when queue fails", async () => {
-    warehouseSyncMock.mockRejectedValue(new Error("queue failed"));
-    const update = jest.fn().mockResolvedValue(undefined);
-    const context = {
-      org: { id: "org1" },
-      models: { eventForwarderConfigs: { update } },
-    } as never;
-
-    await syncEventForwarderStatusFromLicenseServer(
-      context,
-      efConfig() as never,
-    );
-
-    expect(update).not.toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ initialWarehouseSyncQueued: true }),
-    );
-  });
+  expect(update).not.toHaveBeenCalled();
 });

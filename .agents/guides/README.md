@@ -6,6 +6,7 @@ This directory is the canonical home for detailed repository guidance shared by 
 - `development-guidelines.md` — project-wide coding conventions and validation commands
 - `package-boundaries.md` — enforced import and dependency restrictions
 - `permissions.md` — permission and commercial-feature patterns
+- [fork-policy.md](fork-policy.md) — local Enterprise policy, disabled managed services, and preservation across upstream refactors
 - `ui-copy-style.md` — casing and phrasing for all user-facing copy (front-end UI and back-end/API messages)
 - `docs.md` — Mintlify MDX frontmatter (quote YAML values that contain a colon)
 - `frontend/` — React and data-fetching patterns

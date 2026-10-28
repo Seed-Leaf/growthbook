@@ -75,10 +75,6 @@ import {
   generateEmbeddings,
   simpleCompletion,
 } from "back-end/src/enterprise/services/ai";
-import {
-  shouldNotifyLicenseServer,
-  notifyLicenseServerEvent,
-} from "back-end/src/enterprise/licenseUtil";
 import { getObjectDiff } from "back-end/src/events/handlers/webhooks/event-webhooks-utils";
 import { runValidateExperimentHooks } from "back-end/src/enterprise/sandbox/sandbox-eval";
 import {
@@ -2521,21 +2517,6 @@ const onExperimentUpdate = async ({
       experiment: newExperiment,
       organization: context.org,
     });
-
-  const licenseKey = context.org.licenseKey || process.env.LICENSE_KEY;
-
-  if (
-    oldExperiment.status !== "running" &&
-    newExperiment.status === "running" &&
-    shouldNotifyLicenseServer(licenseKey)
-  ) {
-    notifyLicenseServerEvent({
-      licenseKey,
-      eventName: "experiment_started",
-      uniqueId: newExperiment.id,
-      metadata: { experiment_id: newExperiment.id },
-    });
-  }
 };
 
 const onExperimentDelete = async (

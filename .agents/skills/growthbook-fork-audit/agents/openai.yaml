@@ -1,0 +1,4 @@
+interface:
+  display_name: "GrowthBook Fork Audit"
+  short_description: "Audit fork behavior across moves and refactors"
+  default_prompt: "Use $growthbook-fork-audit to check that the current application still satisfies this fork’s behavior contracts."

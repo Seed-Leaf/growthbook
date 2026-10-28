@@ -5,8 +5,6 @@ import { z } from "zod";
 import { SQL_ROW_LIMIT } from "shared/sql";
 import {
   getEventForwarderDatasourceParams,
-  buildManagedWarehouseExposureQueries,
-  getManagedWarehouseUserIdTypeSettings,
   getDataSourceSaveChanges,
 } from "shared/util";
 import {
@@ -34,13 +32,10 @@ import {
   DataSourceInterface,
   ExposureQuery,
   DataSourceInterfaceWithParams,
-  GrowthbookClickhouseDataSource,
-  GrowthbookClickhouseSettings,
 } from "shared/types/datasource";
 import type { BigQueryConnectionParams } from "shared/types/integrations/bigquery";
 import { GoogleAnalyticsParams } from "shared/types/integrations/googleanalytics";
-import type { ClickHouseConnectionParams } from "shared/types/integrations/clickhouse";
-import { SDKAttributeSchema } from "shared/types/organization";
+import { managedServiceUnavailable } from "back-end/src/enterprise/managedServices";
 import { AuthRequest } from "back-end/src/types/AuthRequest";
 import { getContextFromReq } from "back-end/src/services/organizations";
 import { ReqContext } from "back-end/types/request";
@@ -106,11 +101,9 @@ import {
   getDimensionSlicesById,
 } from "back-end/src/models/DimensionSlicesModel";
 import { DimensionSlicesQueryRunner } from "back-end/src/queryRunners/DimensionSlicesQueryRunner";
-import { logger } from "back-end/src/util/logger";
 import { BadRequestError } from "back-end/src/util/errors";
 import { errorStringFromZodResult } from "back-end/src/util/validation";
 import { cancelQueryAndConfirm } from "back-end/src/services/queryCancellation";
-import { IS_CLOUD } from "back-end/src/util/secrets";
 import {
   removeManagedWarehouseLegacyIdentifier,
   setManagedWarehouseIdAttributeIdentifier,
@@ -243,6 +236,8 @@ export async function postDataSources(
       }
   >,
 ) {
+  if (req.body.eventForwarderConfig) managedServiceUnavailable();
+
   const context = getContextFromReq(req);
   const { name, description, type, params, projects, eventForwarderConfig } =
     req.body;
@@ -321,54 +316,14 @@ export async function postManagedWarehouse(
       }
   >,
 ) {
-  if (!IS_CLOUD) {
-    return res.status(403).json({
-      status: 403,
-      message: "This endpoint is only available in GrowthBook Cloud",
-    });
-  }
-
   const context = getContextFromReq(req);
-
   if (
-    !context.superAdmin &&
     !context.permissions.canCreateDataSource({ type: "growthbook_clickhouse" })
-  ) {
+  )
     context.permissions.throwPermissionError();
-  }
-
-  const region: GrowthbookClickhouseSettings["region"] =
-    req.body?.region === "eu-west-1" ? "eu-west-1" : "us-east-1";
-
-  const params: ClickHouseConnectionParams = {
-    url: "https://managed-warehouse-placeholder.invalid",
-    port: 443,
-    username: "pending_provisioning",
-    password: "pending_provisioning",
-    database: "pending_provisioning",
-  };
-  // New warehouses use native ClickHouse JSON columns. Identifiers and exposure
-  // queries are derived from the org's hashAttribute attributes.
-  const datasourceSettings = getManagedWarehouseJsonSettings(
-    context.org.settings?.attributeSchema,
-    { hasBeenProvisioned: false, region },
-  );
-
-  const datasource = await createDataSource(
-    context,
-    "Managed Warehouse",
-    "growthbook_clickhouse",
-    params,
-    datasourceSettings,
-    "managed_warehouse",
-  );
-
-  const integration = getSourceIntegrationObject(context, datasource);
-
-  res.status(200).json({
-    status: 200,
-    id: "managed_warehouse",
-    datasource: await getDataSourceWithParams(context, integration),
+  return res.status(403).json({
+    status: 403,
+    message: "Managed Warehouse is disabled for this installation.",
   });
 }
 
@@ -502,6 +457,8 @@ export async function putDataSource(
       }
   >,
 ) {
+  if (req.body.eventForwarderConfig) managedServiceUnavailable();
+
   const userId = req.userId;
 
   if (!userId) {
@@ -686,118 +643,18 @@ export async function putEventForwarderForDataSource(
   req: AuthRequest<unknown, { id: string }>,
   res: Response,
 ) {
-  const parsed = eventForwarderAccessTestEditBodySchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({
-      status: 400,
-      message: parsed.error.issues.map((i) => i.message).join("; "),
-    });
-  }
-  if (!parsed.data.eventForwarderConfig) {
-    return res.status(400).json({
-      status: 400,
-      message: "Event Forwarder config is required.",
-    });
-  }
-
   const context = getContextFromReq(req);
   const datasource = await getDataSourceById(context, req.params.id);
-  if (!datasource) {
-    return res.status(404).json({
-      status: 404,
-      message: "Cannot find data source",
-    });
-  }
-
-  if (!context.permissions.canUpdateDataSourceSettings(datasource)) {
+  if (!datasource)
+    return res
+      .status(404)
+      .json({ status: 404, message: "Cannot find Data Source." });
+  if (!context.permissions.canUpdateDataSourceSettings(datasource))
     context.permissions.throwPermissionError();
-  }
-  if (
-    parsed.data.params &&
-    !context.permissions.canUpdateDataSourceParams(datasource)
-  ) {
-    context.permissions.throwPermissionError();
-  }
-
-  const existingEventForwarderConfig = await getEventForwarderForDatasource(
-    context,
-    datasource.id,
-  );
-  const projects = datasource.projects ?? [];
-  if (existingEventForwarderConfig) {
-    if (
-      !context.permissions.canUpdateEventForwarderConfig(
-        existingEventForwarderConfig,
-        {
-          ...existingEventForwarderConfig,
-          projects,
-        },
-      )
-    ) {
-      context.permissions.throwPermissionError();
-    }
-  } else if (!context.permissions.canCreateEventForwarderConfig({ projects })) {
-    context.permissions.throwPermissionError();
-  }
-
-  try {
-    const integration = getSourceIntegrationObject(context, datasource);
-    const updates: Partial<DataSourceInterface> = { dateUpdated: new Date() };
-
-    if (parsed.data.params) {
-      mergeParams(integration, parsed.data.params as Partial<DataSourceParams>);
-      await integration.testConnection();
-      updates.params = encryptParams(integration.params);
-    }
-
-    await updateDataSource(context, datasource, updates);
-
-    const updatedDatasource = {
-      ...datasource,
-      ...updates,
-    };
-    const eventForwarderDatasourceParams = getEventForwarderDatasourceParams(
-      updatedDatasource.type,
-      integration.params,
-    );
-    const restartAfterProvision =
-      !!existingEventForwarderConfig?.connectorName?.trim();
-    const syncedEventForwarderConfig =
-      await syncEventForwarderConfigFromDatasource({
-        context,
-        datasource: updatedDatasource,
-        draft: parsed.data.eventForwarderConfig as EventForwarderConfigDraft,
-        datasourceParams: eventForwarderDatasourceParams,
-      });
-    await provisionEventForwarderThroughLicenseServer(
-      context,
-      syncedEventForwarderConfig,
-      eventForwarderDatasourceParams,
-      { restartAfterProvision },
-    );
-
-    res.status(200).json({
-      status: 200,
-      datasource: await getDataSourceWithParams(
-        context,
-        getSourceIntegrationObject(context, updatedDatasource),
-      ),
-    });
-  } catch (e) {
-    const error = e instanceof Error ? e : new Error(String(e));
-    logger.error(
-      {
-        err: error,
-        datasourceId: datasource.id,
-        organizationId: context.org.id,
-      },
-      "Failed to update event forwarder",
-    );
-    res.status(400).json({
-      status: 400,
-      message: error.message || "An error occurred",
-    });
-  }
+  return res.status(503).json({
+    status: 503,
+    message: "Event Forwarder is disabled for this installation.",
+  });
 }
 
 export async function getEventForwarderStatusForDataSource(
@@ -1979,27 +1836,4 @@ export async function putManagedWarehouseIdAttributeIdentifier(
   res.status(200).json({
     status: 200,
   });
-}
-
-// Managed-warehouse settings for the JSON-columns model: identifiers and exposure
-// queries derive from the org's hashAttribute attributes.
-function getManagedWarehouseJsonSettings(
-  attributeSchema: SDKAttributeSchema | undefined,
-  existing: GrowthbookClickhouseDataSource["settings"],
-): GrowthbookClickhouseSettings {
-  return {
-    ...existing,
-    useJsonColumns: true,
-    materializedColumns: undefined,
-    userIdTypes: getManagedWarehouseUserIdTypeSettings(attributeSchema),
-    queries: {
-      ...existing.queries,
-      exposure: buildManagedWarehouseExposureQueries(
-        attributeSchema,
-        [],
-        [],
-        existing.idAttributeIdentifier === "user_id" ? "user_id" : "device_id",
-      ),
-    },
-  };
 }

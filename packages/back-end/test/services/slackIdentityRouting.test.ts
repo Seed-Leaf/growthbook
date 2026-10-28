@@ -3,11 +3,6 @@ import {
   getSlackLinkConsent,
 } from "back-end/src/services/slack/slackIdentity";
 import { buildSlackLinkUrl } from "back-end/src/services/slack/slackLink";
-import { licenseInit } from "back-end/src/enterprise";
-import {
-  getLicenseMetaData,
-  getUserCodesForOrg,
-} from "back-end/src/services/licenseData";
 import { getContextForUserIdInOrg } from "back-end/src/services/organizations";
 import { SlackUserLinkModel } from "back-end/src/models/SlackUserLinkModel";
 import { SlackWorkspaceConnectionModel } from "back-end/src/models/SlackWorkspaceConnectionModel";
@@ -32,7 +27,6 @@ jest.mock("back-end/src/models/SlackWorkspaceConnectionModel", () => ({
 jest.mock("back-end/src/services/organizations", () => ({
   getContextForUserIdInOrg: jest.fn(),
 }));
-jest.mock("back-end/src/enterprise", () => ({ licenseInit: jest.fn() }));
 jest.mock("back-end/src/util/slackToken", () => ({
   decryptSlackBotToken: (token: string) => token,
 }));
@@ -66,7 +60,6 @@ beforeEach(() => {
     .mocked(SlackUserLinkModel.dangerousFindAllBySlackIdentity)
     .mockResolvedValue([linked("org1")]);
   jest.mocked(getContextForUserIdInOrg).mockResolvedValue(context);
-  jest.mocked(licenseInit).mockResolvedValue(undefined);
 });
 it("resolves the workspace's organization without notification subscriptions", async () => {
   expect(await resolveSlackAssistantTarget(request)).toMatchObject({
@@ -117,25 +110,6 @@ it("rechecks revoked membership", async () => {
   expect(await resolveSlackAssistantTarget(request)).toMatchObject({
     ok: false,
     reason: "not_a_member",
-  });
-  expect(licenseInit).not.toHaveBeenCalled();
-});
-it("loads the organization license for the resolved context", async () => {
-  await resolveSlackAssistantTarget(request);
-  expect(licenseInit).toHaveBeenCalledWith(
-    context.org,
-    getUserCodesForOrg,
-    getLicenseMetaData,
-  );
-});
-it("tells the user when the organization license can't be loaded", async () => {
-  jest
-    .mocked(licenseInit)
-    .mockRejectedValue(new Error("License server unavailable"));
-  expect(await resolveSlackAssistantTarget(request)).toMatchObject({
-    ok: false,
-    reason: "license_unavailable",
-    botToken: "token_org1",
   });
 });
 it("respects an explicit assistant opt-out", async () => {

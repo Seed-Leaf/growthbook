@@ -2,6 +2,25 @@
 
 This file provides guidance to all coding agents working in this repository.
 
+## Fork Behavior (Preserve During Upstream Updates)
+
+Read [.agents/guides/fork-policy.md](.agents/guides/fork-policy.md) before changing
+plans, licensing, billing, managed services or integrating an upstream release.
+This fork grants Enterprise locally, removes GrowthBook management-server calls,
+and disables external managed provisioning. Preserve customer AI, SSO, data
+sources and custom proxies, along with authentication and scoped permissions.
+
+Preserve these **behaviors**, not historical paths or function names. After a
+refactor, trace active routes, jobs and UI consumers to the new implementation;
+rebind checks only after verifying coverage. Clean merges and green tests against
+unused old helpers are not sufficient. Run `pnpm fork:check` and `pnpm fork:test`.
+
+Versioned workflows:
+
+- [Upstream upgrade](.agents/skills/growthbook-upstream-upgrade/SKILL.md)
+- [Preservation audit](.agents/skills/growthbook-fork-audit/SKILL.md)
+- [Regression repair](.agents/skills/growthbook-fork-repair/SKILL.md)
+
 ## Build & Development Commands
 
 ```bash
