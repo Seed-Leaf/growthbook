@@ -1,0 +1,4 @@
+interface:
+  display_name: "GrowthBook Fork Repair"
+  short_description: "Repair fork policy regressions in current code"
+  default_prompt: "Use $growthbook-fork-repair to repair the identified fork regression in the current architecture and verify its real callers."

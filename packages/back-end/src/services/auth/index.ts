@@ -36,11 +36,7 @@ import { getBuild } from "back-end/src/util/build";
 import { usingFileConfig } from "back-end/src/init/config";
 import { getUserPermissions } from "back-end/src/util/organization.util";
 import { insertAudit } from "back-end/src/models/AuditModel";
-import {
-  getLicenseMetaData,
-  getUserCodesForOrg,
-} from "back-end/src/services/licenseData";
-import { licenseInit, getEffectiveAccountPlan } from "back-end/src/enterprise";
+import { getEffectiveAccountPlan } from "back-end/src/enterprise";
 import {
   getGrowthBookClient,
   getGrowthBookRequestUrl,
@@ -268,13 +264,6 @@ export async function processJWT(
           });
           return;
         }
-
-        // init license for org if it exists
-        await licenseInit(
-          req.organization,
-          getUserCodesForOrg,
-          getLicenseMetaData,
-        );
       } else {
         res.status(404).json({
           status: 404,

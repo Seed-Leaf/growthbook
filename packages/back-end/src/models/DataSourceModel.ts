@@ -28,6 +28,7 @@ import {
 } from "shared/types/datasource";
 import { GoogleAnalyticsParams } from "shared/types/integrations/googleanalytics";
 import { ApiDataSource } from "shared/validators";
+import { managedServiceUnavailable } from "back-end/src/enterprise/managedServices";
 import { getOauth2Client } from "back-end/src/integrations/GoogleAnalytics";
 import {
   encryptParams,
@@ -47,12 +48,7 @@ import { IS_CLOUD } from "back-end/src/util/secrets";
 import { ReqContext } from "back-end/types/request";
 import { ApiReqContext } from "back-end/types/api";
 import { logger } from "back-end/src/util/logger";
-import {
-  ensureIndexOnce,
-  getCollection,
-  isDuplicateKeyError,
-  isDuplicateKeyErrorForIndex,
-} from "back-end/src/util/mongo.util";
+import { isDuplicateKeyErrorForIndex } from "back-end/src/util/mongo.util";
 import { deleteClickhouseUser } from "back-end/src/services/licenseServerManagedClickhouse";
 import { createModelAuditLogger } from "back-end/src/services/audit";
 import { syncEventForwarderAfterDatasourceDeleted } from "back-end/src/services/eventForwarder/datasourceLifecycle";
@@ -515,23 +511,7 @@ export async function createDataSource(
     throw new Error("Cannot add. Data sources managed by config.yml");
   }
 
-  // Unfiltered by project permissions so a Managed Warehouse the user can't
-  // read still counts.
-  if (type === "growthbook_clickhouse") {
-    await ensureIndexOnce(
-      getCollection("datasources"),
-      { organization: 1 },
-      managedWarehouseUniquenessIndex,
-    );
-    if (
-      await DataSourceModel.exists({
-        organization: context.org.id,
-        type: "growthbook_clickhouse",
-      })
-    ) {
-      throw new Error(MANAGED_WAREHOUSE_EXISTS_ERROR);
-    }
-  }
+  if (type === "growthbook_clickhouse") managedServiceUnavailable();
 
   id = id || uniqid("ds_");
   projects = projects || [];
@@ -585,17 +565,9 @@ export async function createDataSource(
   );
   validatePipelineSettingsInvariants(settings.pipelineSettings);
 
-  let model: DataSourceDocument;
-  try {
-    model = (await DataSourceModel.create(datasource)) as DataSourceDocument;
-  } catch (error) {
-    // The fixed managed-warehouse id can lose to {id, organization} instead of
-    // the partial index. Either duplicate key means the org already has one.
-    if (type === "growthbook_clickhouse" && isDuplicateKeyError(error)) {
-      throw new Error(MANAGED_WAREHOUSE_EXISTS_ERROR);
-    }
-    throw error;
-  }
+  const model = (await DataSourceModel.create(
+    datasource,
+  )) as DataSourceDocument;
   context.forgetDataSourceRefs();
 
   const integration = getSourceIntegrationObject(context, datasource);

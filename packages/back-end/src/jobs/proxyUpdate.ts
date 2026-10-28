@@ -3,7 +3,6 @@ import Agenda, { Job } from "agenda";
 import { SDKConnectionInterface } from "shared/types/sdk-connection";
 import { WEBHOOK_CONSECUTIVE_FAILURES_THRESHOLD } from "shared/constants";
 import { getFeatureDefinitionsWithCache } from "back-end/src/controllers/features";
-import { IS_CLOUD } from "back-end/src/util/secrets";
 import {
   clearProxyError,
   findSDKConnectionById,
@@ -27,6 +26,7 @@ const proxyUpdate = async (job: ProxyUpdateJob) => {
   const connectionId = job.attrs.data?.connectionId;
   const orgId = job.attrs.data?.orgId;
   const useCloudProxy = job.attrs.data?.useCloudProxy;
+  if (useCloudProxy) return;
   if (!connectionId) {
     logger.error(
       {
@@ -88,14 +88,11 @@ const proxyUpdate = async (job: ProxyUpdateJob) => {
     }),
   );
 
-  // note: Cloud users will typically have proxy.enabled === false (unless using a local proxy), but will still have a valid proxy.signingKey
   const signature = createHmac("sha256", connection.proxy.signingKey)
     .update(payload)
     .digest("hex");
 
-  const url = useCloudProxy
-    ? `https://proxy.growthbook.io/proxy/features`
-    : `${connection.proxy.host.replace(/\/$/, "")}/proxy/features`;
+  const url = `${connection.proxy.host.replace(/\/$/, "")}/proxy/features`;
 
   const res = await fireProxyWebhook({
     url,
@@ -173,11 +170,6 @@ export async function queueProxyUpdate(
   for (let i = 0; i < connections.length; i++) {
     const connection = connections[i];
 
-    if (IS_CLOUD) {
-      // Always fire webhook to GB Cloud Proxy for cloud users
-      await queueSingleProxyUpdate(context.org.id, connection, true);
-    }
-    // If connection (cloud or self-hosted) specifies an (additional) proxy host, fire webhook
     await queueSingleProxyUpdate(context.org.id, connection, false);
   }
 }
@@ -187,7 +179,7 @@ function connectionSupportsProxyUpdate(
   useCloudProxy: boolean,
 ) {
   if (useCloudProxy) {
-    return IS_CLOUD;
+    return false;
   }
   return !!(connection.proxy.enabled && connection.proxy.host);
 }

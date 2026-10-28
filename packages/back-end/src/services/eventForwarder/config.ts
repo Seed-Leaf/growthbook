@@ -32,6 +32,7 @@ import {
   resolveSnowflakeEventForwarderTableNames,
   resolveDatabricksEventForwarderTables,
 } from "shared/util";
+import { managedServiceUnavailable } from "back-end/src/enterprise/managedServices";
 import { ReqContext } from "back-end/types/request";
 import { ENCRYPTION_KEY } from "back-end/src/util/secrets";
 
@@ -676,7 +677,6 @@ export async function syncEventForwarderConfigFromDatasource({
   context,
   datasource,
   draft,
-  datasourceParams,
 }: {
   context: ReqContext;
   datasource: Pick<
@@ -686,6 +686,8 @@ export async function syncEventForwarderConfigFromDatasource({
   draft?: EventForwarderConfigDraft | null;
   datasourceParams?: EventForwarderDatasourceParams;
 }): Promise<EventForwarderConfigInterface | null> {
+  if (draft) managedServiceUnavailable();
+
   const sinkType = getEventForwarderSinkTypeForDatasource(datasource);
 
   if (!sinkType || draft === undefined) {
@@ -705,46 +707,7 @@ export async function syncEventForwarderConfigFromDatasource({
     return null;
   }
 
-  const normalizedPayload = buildNormalizedSinkPayload(
-    draft,
-    datasourceParams,
-    existing,
-  );
-  validateNormalizedSinkPayload(draft, datasourceParams, normalizedPayload);
-
-  const projects = [...(datasource.projects ?? [])].sort();
-
-  if (!existing) {
-    await assertNoEventForwarderInOrg(context);
-    return await context.models.eventForwarderConfigs.create({
-      datasourceId: datasource.id,
-      projects,
-      topic: isInHouseConsumerSink(draft.sinkType)
-        ? getInHouseConsumerTopicName(draft.sinkType)
-        : getEventForwarderTopicName(datasource.organization, datasource.id),
-      // Provisioning resolves the current registry schema id after the topic exists.
-      schemaId: 0,
-      sinkType: draft.sinkType,
-      region: draft.region ?? "us-east-1",
-      config: encryptSinkConfig(normalizedPayload),
-      status: "pending",
-      connectorName: "",
-      connectorId: "",
-      lastProvisioningError: "",
-    });
-  }
-
-  return await context.models.eventForwarderConfigs.update(existing, {
-    datasourceId: existing.datasourceId || datasource.id,
-    projects,
-    topic:
-      existing.topic ||
-      getEventForwarderTopicName(datasource.organization, datasource.id),
-    schemaId: existing.schemaId || 0,
-    config: encryptSinkConfig(normalizedPayload),
-    status: "pending",
-    lastProvisioningError: "",
-  });
+  return null;
 }
 
 export function decryptEventForwarderConfigModel<T extends SinkConfig>(

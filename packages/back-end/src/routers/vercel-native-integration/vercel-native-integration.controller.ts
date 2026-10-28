@@ -43,14 +43,9 @@ import {
   trackLoginForUser,
 } from "back-end/src/services/users";
 import {
-  licenseInit,
   postCancelSubscriptionToLicenseServer,
   postNewVercelSubscriptionToLicenseServer,
 } from "back-end/src/enterprise";
-import {
-  getLicenseMetaData,
-  getUserCodesForOrg,
-} from "back-end/src/services/licenseData";
 import { getLicenseByKey } from "back-end/src/enterprise/models/licenseModel";
 import { getEffectiveOrgLimits } from "back-end/src/services/plan-limits";
 import { logger } from "back-end/src/util/logger";
@@ -201,14 +196,6 @@ const getOrgFromInstallationResource = async <T>(
   const org = await findOrganizationById(integration.organization);
 
   if (!org) throw new Error("Invalid installation!");
-
-  // Vercel routes mount before the auth middleware that normally warms the
-  // license cache; without this, paid orgs resolve as starter. Errors
-  // propagate (like every other warm site) — a retryable failure beats
-  // enforcing free-tier limits or minting admin members on a paid org.
-  if (org.licenseKey) {
-    await licenseInit(org, getUserCodesForOrg, getLicenseMetaData);
-  }
 
   return {
     org,

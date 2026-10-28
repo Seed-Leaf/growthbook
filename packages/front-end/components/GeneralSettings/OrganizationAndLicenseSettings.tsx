@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { OrganizationInterface } from "shared/types/organization";
 import { Box, Flex, Heading, Text } from "@radix-ui/themes";
 import ShowLicenseInfo from "@/components/License/ShowLicenseInfo";
@@ -16,7 +16,7 @@ export default function OrganizationAndLicenseSettings({
   org: Partial<OrganizationInterface>;
   refreshOrg: () => Promise<void>;
 }) {
-  const { installationName, license } = useUser();
+  const { installationName, effectiveAccountPlan } = useUser();
   const [editOpen, setEditOpen] = useState(false);
   const permissions = usePermissions();
   // this check isn't strictly necessary, as we check permissions accessing the settings page, but it's a good to be safe
@@ -26,7 +26,7 @@ export default function OrganizationAndLicenseSettings({
     (e) => e[1].email === org.ownerEmail,
   );
   const showInstallationName =
-    license?.plan === "enterprise" && !isCloud() && isMultiOrg();
+    effectiveAccountPlan === "enterprise" && !isCloud() && isMultiOrg();
 
   return (
     <>

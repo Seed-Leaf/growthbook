@@ -492,3 +492,25 @@ describe("syncEventForwarderConfigFromDatasource draft null", () => {
     expect(deleteConfig).not.toHaveBeenCalled();
   });
 });
+
+it("rejects forwarder configuration before creating or updating a row", async () => {
+  const create = jest.fn();
+  const update = jest.fn();
+  const context = {
+    models: { eventForwarderConfigs: { create, update } },
+  } as unknown as Parameters<
+    typeof syncEventForwarderConfigFromDatasource
+  >[0]["context"];
+  await expect(
+    syncEventForwarderConfigFromDatasource({
+      context,
+      datasource: bqDatasource("ds"),
+      draft: {
+        sinkType: "bigquery",
+        config: { projectId: "project", dataset: "events", tablePrefix: "gb" },
+      },
+    }),
+  ).rejects.toMatchObject({ status: 503 });
+  expect(create).not.toHaveBeenCalled();
+  expect(update).not.toHaveBeenCalled();
+});

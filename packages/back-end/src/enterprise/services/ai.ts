@@ -55,7 +55,6 @@ import {
   AIKeySource,
   missingAIKeyMessage,
 } from "back-end/src/services/aiCredentials";
-import { logCloudAIUsage } from "back-end/src/services/licenseServerManagedClickhouse";
 import { AIUsageOutcome, trackAIUsage } from "back-end/src/services/growthbook";
 import {
   addCompletionUsage,
@@ -542,15 +541,13 @@ export const simpleCompletion = async ({
   return result;
 };
 
-// One record per AI call for analytics, the managed-key cap and the Cloud
-// usage log. Accounting failures never turn a finished AI response into a 500.
+// Accounting failures never turn a finished AI response into a 500.
 export function usageRecorder({
   context,
   model,
   ownKey,
   type,
   isDefaultPrompt,
-  temperature,
 }: {
   context: ReqContext | ApiReqContext;
   model: AIModel;
@@ -597,16 +594,6 @@ export function usageRecorder({
         logger.error(e, "could not meter AI token usage");
       }
     }
-
-    logCloudAIUsage({
-      organization: context.org.id,
-      type,
-      model,
-      numPromptTokensUsed: buckets.inputTokens,
-      numCompletionTokensUsed: buckets.outputTokens,
-      temperature,
-      usedDefaultPrompt: isDefaultPrompt,
-    });
   };
 }
 
@@ -1181,17 +1168,6 @@ export const parsePrompt = async <T extends ZodObject<ZodRawShape>>({
   });
 
   if (IS_CLOUD) {
-    // Fire and forget
-    logCloudAIUsage({
-      organization: context.org.id,
-      type,
-      model: model,
-      numPromptTokensUsed: response.usage?.inputTokens,
-      numCompletionTokensUsed: response.usage?.outputTokens,
-      temperature: effectiveTemperature,
-      usedDefaultPrompt: isDefaultPrompt,
-    });
-
     // Only meter usage against the daily cap when GrowthBook is paying.
     if (!ownKey) {
       const numTokensUsed =

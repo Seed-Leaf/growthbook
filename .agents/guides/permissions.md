@@ -284,6 +284,12 @@ class MyResourceModel extends BaseClass {
 
 ## Commercial Features
 
+In this fork, Enterprise entitlements resolve locally without a license key.
+The [fork policy](fork-policy.md) governs that resolution and disables external
+managed services. Keep feature gates and user permission checks distinct:
+Enterprise availability does not grant administrative privileges or make a
+disabled managed integration operational.
+
 Commercial features are a separate gate from permissions. A user might have permission but the organization's plan might not include the feature.
 
 ### Frontend - Check Feature Availability

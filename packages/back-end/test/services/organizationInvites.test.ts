@@ -1,9 +1,5 @@
 import { OrganizationInterface } from "shared/types/organization";
-import {
-  getAccountPlan,
-  getLicense,
-  licenseInit,
-} from "back-end/src/enterprise";
+import { getAccountPlan, getLicense } from "back-end/src/enterprise";
 import { addOrganizationInviteIfSeatAvailable } from "back-end/src/models/OrganizationModel";
 import { inviteUser } from "back-end/src/services/organizations";
 
@@ -11,7 +7,6 @@ jest.mock("back-end/src/enterprise", () => ({
   ...jest.requireActual("back-end/src/enterprise"),
   getAccountPlan: jest.fn(),
   getLicense: jest.fn(),
-  licenseInit: jest.fn(),
 }));
 
 jest.mock("back-end/src/models/OrganizationModel", () => ({
@@ -46,7 +41,6 @@ jest.mock("back-end/src/util/secrets", () => ({
 
 const mockedGetAccountPlan = jest.mocked(getAccountPlan);
 const mockedGetLicense = jest.mocked(getLicense);
-const mockedLicenseInit = jest.mocked(licenseInit);
 const mockedAddOrganizationInviteIfSeatAvailable = jest.mocked(
   addOrganizationInviteIfSeatAvailable,
 );
@@ -83,7 +77,6 @@ describe("inviteUser email validation", () => {
     jest.clearAllMocks();
     mockedGetAccountPlan.mockReturnValue("enterprise");
     mockedGetLicense.mockReturnValue(null);
-    mockedLicenseInit.mockResolvedValue(undefined);
     mockedAddOrganizationInviteIfSeatAvailable.mockImplementation(
       async (id, invite) =>
         ({

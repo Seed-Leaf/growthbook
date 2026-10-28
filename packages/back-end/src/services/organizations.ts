@@ -148,14 +148,9 @@ import { getAllExperiments } from "back-end/src/models/ExperimentModel";
 import { addTags } from "back-end/src/models/TagModel";
 import { getUserById, getUsersByIds } from "back-end/src/models/UserModel";
 import {
-  getLicenseMetaData,
-  getUserCodesForOrg,
-} from "back-end/src/services/licenseData";
-import {
   getAccountPlan,
   getLicense,
   getLowestPlanPerFeature,
-  licenseInit,
   orgHasPremiumFeature,
 } from "back-end/src/enterprise";
 import { getEffectiveOrgLimits } from "back-end/src/services/plan-limits";
@@ -187,27 +182,12 @@ export async function getOrganizationById(id: string) {
   return findOrganizationById(id);
 }
 
-export async function setLicenseKey(
+export const setLicenseKey: (
   org: OrganizationInterface,
   licenseKey: string,
-) {
-  if (!IS_CLOUD && IS_MULTI_ORG) {
-    throw new Error(
-      "You must use the LICENSE_KEY environmental variable on multi org sites.",
-    );
-  }
-
-  const license = await licenseInit(
-    { ...org, licenseKey },
-    getUserCodesForOrg,
-    getLicenseMetaData,
-    true,
-  );
-  if (license?.organizationId && license.organizationId !== org.id) {
-    throw new Error("This license key belongs to a different organization");
-  }
-  org.licenseKey = licenseKey;
-}
+) => Promise<void> = async () => {
+  throw new Error("License keys are not used by this installation.");
+};
 
 export function validateLoginMethod(
   org: OrganizationInterface,
@@ -586,9 +566,7 @@ type OrganizationSeatLimit = {
 async function getOrganizationSeatLimit(
   organization: OrganizationInterface,
 ): Promise<OrganizationSeatLimit | null> {
-  const license =
-    getLicense(organization.licenseKey) ||
-    (await licenseInit(organization, getUserCodesForOrg, getLicenseMetaData));
+  const license = getLicense(organization.licenseKey);
 
   const hardCapLimit: OrganizationSeatLimit | null = license?.hardCap
     ? {
@@ -639,13 +617,6 @@ export async function removeMember(
   updatedOrganization.members = members;
   updatedOrganization.pendingMembers = pendingMembers;
 
-  await licenseInit(
-    updatedOrganization,
-    getUserCodesForOrg,
-    getLicenseMetaData,
-    true,
-  );
-
   return updatedOrganization;
 }
 
@@ -661,12 +632,6 @@ export async function revokeInvite(
 
   const updatedOrganization = cloneDeep(organization);
   updatedOrganization.invites = invites;
-  await licenseInit(
-    updatedOrganization,
-    getUserCodesForOrg,
-    getLicenseMetaData,
-    true,
-  );
 
   return updatedOrganization;
 }
@@ -895,13 +860,6 @@ export async function addMemberToOrg({
     }
     throw new Error("Unable to add organization member");
   }
-
-  await licenseInit(
-    updatedOrganization,
-    getUserCodesForOrg,
-    getLicenseMetaData,
-    true,
-  );
 }
 
 export async function addMembersToTeam({
@@ -1234,13 +1192,6 @@ export async function inviteUser({
     }
     throw new Error("Unable to add organization invite");
   }
-
-  await licenseInit(
-    updatedOrganization,
-    getUserCodesForOrg,
-    getLicenseMetaData,
-    true,
-  );
 
   let emailSent = false;
   if (isEmailEnabled()) {
@@ -1940,10 +1891,6 @@ export async function getContextForAgendaJobByOrgId(
   const organization = await findOrganizationById(orgId);
 
   if (!organization) throw new Error("Organization not found");
-
-  if (organization.licenseKey && !getLicense(organization.licenseKey)) {
-    await licenseInit(organization, getUserCodesForOrg, getLicenseMetaData);
-  }
 
   return getContextForAgendaJobByOrgObject(organization);
 }

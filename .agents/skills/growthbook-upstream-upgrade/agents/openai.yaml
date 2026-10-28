@@ -1,0 +1,4 @@
+interface:
+  display_name: "GrowthBook Upstream Upgrade"
+  short_description: "Upgrade this fork while preserving local policy"
+  default_prompt: "Use $growthbook-upstream-upgrade to integrate the requested upstream release while preserving this fork’s behavior contracts."
