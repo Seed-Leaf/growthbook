@@ -34,6 +34,7 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
+      DISABLE_TELEMETRY: "true"
       APP_ORIGIN: https://growthbook.moulder.dev
       API_HOST: https://growthbook-api.moulder.dev
       MONGODB_URI: mongodb://growthbook:${MONGO_PASSWORD:?Set a MongoDB password}@mongo:27017/growthbook?authSource=admin
